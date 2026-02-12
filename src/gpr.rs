@@ -687,7 +687,12 @@ impl GPR {
         location: GPRLocation,
         metadata: GPRMeta,
     ) -> Result<GPR, Box<dyn Error>> {
-        let data = io::load_rd3(&metadata.rd3_filepath, metadata.samples as usize)?;
+
+        let data = match metadata.rd3_filepath.extension().map(|s| s.to_str()).flatten() {
+            Some("rd3") => Ok(io::load_rd3(&metadata.rd3_filepath, metadata.samples as usize)?),
+            Some("dt1") => Ok(io::load_pe_dt1(&metadata.rd3_filepath, metadata.samples as usize, metadata.last_trace as usize)?),
+            _ => Err(format!("Unknown filetype: {:?}", metadata.rd3_filepath))
+        }?;
 
         let location_data = match data.shape()[1] == location.cor_points.len() {
             true => location,
@@ -1498,36 +1503,60 @@ pub fn run(params: RunParams) -> Result<Vec<GPR>, Box<dyn Error>> {
     let empty: Vec<GPR> = Vec::new();
     let mut gprs: Vec<(PathBuf, GPR)> = Vec::new();
     for filepath in &params.filepaths {
-        // The given filepath may be ".rd3" or may not have an extension at all
-        // Counterintuitively to the user point of view, it's the ".rad" file that should be given
-        let rad_filepath = filepath.with_extension("rad");
 
-        // Make sure that it exists
-        if !rad_filepath.is_file() {
-            if filepath.is_file() {
-                return Err(
-                    format!("File found but no '.rad' file found: {:?}", rad_filepath).into(),
-                );
-            }
-            return Err(format!("File not found: {:?}", rad_filepath).into());
-        };
-        // Load the GPR metadata from the rad file
-        let gpr_meta = io::load_rad(&rad_filepath, params.medium_velocity)?;
+        let ext = filepath.extension().map(|s| s.to_str()).flatten().unwrap();
 
-        // Load the GPR location data
-        // If the "--cor" argument was used, load from there. Otherwise, try to find a ".cor" file
-        let mut gpr_locations = match &params.cor_path {
-            Some(fp) => io::load_cor(fp, params.crs.as_ref())?,
-            None => match gpr_meta.find_cor(params.crs.as_ref()) {
-                Ok(v) => Ok(v),
-                Err(e) => match params.filepaths.len() > 1 {
-                    true => {
-                        eprintln!("Error in batch mode, continuing anyway: {:?}", e);
-                        continue;
-                    }
-                    false => Err(e),
-                },
-            }?,
+        let (gpr_meta, mut gpr_locations) = if ["hd", "dt1"].contains(&ext) {
+
+            let hd_filepath = filepath.with_extension("hd");
+            // Make sure that it exists
+            if !hd_filepath.is_file() {
+                if filepath.is_file() {
+                    return Err(
+                        format!("File found but no '.hd' file found: {:?}", hd_filepath).into(),
+                    );
+                }
+                return Err(format!("File not found: {:?}", hd_filepath).into());
+            };
+
+            let gpr_meta = io::load_pe_hd(filepath, params.medium_velocity)?;
+
+            let gpr_locations = io::load_pe_gp2(&filepath.with_extension("gp2"), params.crs.as_ref())?;
+            (gpr_meta, gpr_locations)
+
+        } else {
+            // The given filepath may be ".rd3" or may not have an extension at all
+            // Counterintuitively to the user point of view, it's the ".rad" file that should be given
+            let rad_filepath = filepath.with_extension("rad");
+
+            // Make sure that it exists
+            if !rad_filepath.is_file() {
+                if filepath.is_file() {
+                    return Err(
+                        format!("File found but no '.rad' file found: {:?}", rad_filepath).into(),
+                    );
+                }
+                return Err(format!("File not found: {:?}", rad_filepath).into());
+            };
+            // Load the GPR metadata from the rad file
+            let gpr_meta = io::load_rad(&rad_filepath, params.medium_velocity)?;
+
+            // Load the GPR location data
+            // If the "--cor" argument was used, load from there. Otherwise, try to find a ".cor" file
+            let mut gpr_locations = match &params.cor_path {
+                Some(fp) => io::load_cor(fp, params.crs.as_ref())?,
+                None => match gpr_meta.find_cor(params.crs.as_ref()) {
+                    Ok(v) => Ok(v),
+                    Err(e) => match params.filepaths.len() > 1 {
+                        true => {
+                            eprintln!("Error in batch mode, continuing anyway: {:?}", e);
+                            continue;
+                        }
+                        false => Err(e),
+                    },
+                }?,
+            };
+            (gpr_meta, gpr_locations)
         };
 
         // If a "--dem" was given, substitute elevations using said DEM
@@ -1577,7 +1606,7 @@ pub fn run(params: RunParams) -> Result<Vec<GPR>, Box<dyn Error>> {
                 Err(e) => {
                     return Err(format!(
                         "Error loading GPR data from {:?}: {:?}",
-                        rad_filepath.with_extension("rd3"),
+                        filepath.with_extension("rd3"),
                         e
                     )
                     .into())
