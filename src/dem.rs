@@ -175,6 +175,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] // Added 2026-02-17 because gdal is hard to install in CI
     #[serial_test::serial]
     fn test_read_elevations() {
         let coords_elevs = make_test_coords();
@@ -235,6 +236,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] // Added 2026-02-17 because gdal is hard to install in CI
     #[serial_test::serial]
     fn test_no_gdal_failure() {
         let crs = Crs::Utm(UtmCrs {

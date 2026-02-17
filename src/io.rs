@@ -800,6 +800,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] // Added 2026-02-17 because gdal is hard to install in CI
     fn test_load_cor() {
         let temp_dir = tempfile::tempdir().unwrap();
         let cor_path = temp_dir.path().join("hello.cor");
@@ -882,6 +883,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] // Added 2026-02-17 because gdal is hard to install in CI
     fn test_load_pe_hd() {
         // Fake a .rad metadata file
         let temp_dir = tempfile::tempdir().unwrap();
@@ -939,6 +941,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] // Added 2026-02-17 because gdal is hard to install in CI
     fn test_load_pe_gp2() {
         let temp_dir = tempfile::tempdir().unwrap();
         let gp2_path = temp_dir.path().join("hello.gp2");
@@ -981,6 +984,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] // Added 2026-02-17 because gdal is hard to install in CI
     fn test_export_locations() {
         use super::export_locations;
         let temp_dir = tempfile::tempdir().unwrap();
