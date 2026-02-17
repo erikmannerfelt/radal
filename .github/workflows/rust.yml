@@ -29,12 +29,12 @@ jobs:
           sudo apt install -y gdal-bin proj-bin
 
       # Enable for gdal/proj on windows
-      # - name: Install dependencies (Windows)
-      #   if: runner.os == 'Windows'
-      #   shell: powershell
-      #   run: |
-      #     choco install -y gdal
-      #     choco install -y proj
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          choco install -y gdal
+          choco install -y proj
 
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
