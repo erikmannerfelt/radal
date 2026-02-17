@@ -42,8 +42,8 @@ pub struct GPRMeta {
     pub time_window: f32,
     /// The number of traces in the data (the horizontal data size)
     pub last_trace: u32,
-    /// The path to the RD3 metadata file
-    pub rd3_filepath: PathBuf,
+    /// The path to the data file
+    pub data_filepath: PathBuf,
     /// The velocity of the medium (m / ns)
     pub medium_velocity: f32,
 }
@@ -54,7 +54,7 @@ impl GPRMeta {
     /// # Arguments
     /// - `projected_crs`: The CRS to project coordinates into
     pub fn find_cor(&self, projected_crs: Option<&String>) -> Result<GPRLocation, Box<dyn Error>> {
-        io::load_cor(&self.rd3_filepath.with_extension("cor"), projected_crs)
+        io::load_cor(&self.data_filepath.with_extension("cor"), projected_crs)
     }
 }
 
@@ -76,7 +76,7 @@ Time between traces:\t{} s
 Antenna:\t\t{}
 Antenna separation:\t{} m
 ",
-            self.rd3_filepath,
+            self.data_filepath,
             self.samples,
             self.last_trace,
             self.time_window,
@@ -687,11 +687,22 @@ impl GPR {
         location: GPRLocation,
         metadata: GPRMeta,
     ) -> Result<GPR, Box<dyn Error>> {
-
-        let data = match metadata.rd3_filepath.extension().map(|s| s.to_str()).flatten() {
-            Some("rd3") => Ok(io::load_rd3(&metadata.rd3_filepath, metadata.samples as usize)?),
-            Some("dt1") => Ok(io::load_pe_dt1(&metadata.rd3_filepath, metadata.samples as usize, metadata.last_trace as usize)?),
-            _ => Err(format!("Unknown filetype: {:?}", metadata.rd3_filepath))
+        let data = match metadata
+            .data_filepath
+            .extension()
+            .map(|s| s.to_str())
+            .flatten()
+        {
+            Some("rd3") => Ok(io::load_rd3(
+                &metadata.data_filepath,
+                metadata.samples as usize,
+            )?),
+            Some("dt1") => Ok(io::load_pe_dt1(
+                &metadata.data_filepath,
+                metadata.samples as usize,
+                metadata.last_trace as usize,
+            )?),
+            _ => Err(format!("Unknown filetype: {:?}", metadata.data_filepath)),
         }?;
 
         let location_data = match data.shape()[1] == location.cor_points.len() {
@@ -1475,7 +1486,7 @@ impl GPR {
 
             self.log_event(
                 "merge",
-                &format!("Merged {:?}", other.metadata.rd3_filepath),
+                &format!("Merged {:?}", other.metadata.data_filepath),
                 start_time,
             );
 
@@ -1503,11 +1514,9 @@ pub fn run(params: RunParams) -> Result<Vec<GPR>, Box<dyn Error>> {
     let empty: Vec<GPR> = Vec::new();
     let mut gprs: Vec<(PathBuf, GPR)> = Vec::new();
     for filepath in &params.filepaths {
-
         let ext = filepath.extension().map(|s| s.to_str()).flatten().unwrap();
 
         let (gpr_meta, mut gpr_locations) = if ["hd", "dt1"].contains(&ext) {
-
             let hd_filepath = filepath.with_extension("hd");
             // Make sure that it exists
             if !hd_filepath.is_file() {
@@ -1519,11 +1528,11 @@ pub fn run(params: RunParams) -> Result<Vec<GPR>, Box<dyn Error>> {
                 return Err(format!("File not found: {:?}", hd_filepath).into());
             };
 
-            let gpr_meta = io::load_pe_hd(filepath, params.medium_velocity)?;
+            let gpr_meta = io::load_pe_hd(&hd_filepath, params.medium_velocity)?;
 
-            let gpr_locations = io::load_pe_gp2(&filepath.with_extension("gp2"), params.crs.as_ref())?;
+            let gpr_locations =
+                io::load_pe_gp2(&filepath.with_extension("gp2"), params.crs.as_ref())?;
             (gpr_meta, gpr_locations)
-
         } else {
             // The given filepath may be ".rd3" or may not have an extension at all
             // Counterintuitively to the user point of view, it's the ".rad" file that should be given
@@ -1543,7 +1552,7 @@ pub fn run(params: RunParams) -> Result<Vec<GPR>, Box<dyn Error>> {
 
             // Load the GPR location data
             // If the "--cor" argument was used, load from there. Otherwise, try to find a ".cor" file
-            let mut gpr_locations = match &params.cor_path {
+            let gpr_locations = match &params.cor_path {
                 Some(fp) => io::load_cor(fp, params.crs.as_ref())?,
                 None => match gpr_meta.find_cor(params.crs.as_ref()) {
                     Ok(v) => Ok(v),
@@ -1676,7 +1685,7 @@ pub fn run(params: RunParams) -> Result<Vec<GPR>, Box<dyn Error>> {
         // Record the starting time to show "t+XX" times
         let start_time = SystemTime::now();
         if !params.quiet {
-            println!("Processing {:?}", gpr.metadata.rd3_filepath);
+            println!("Processing {:?}", gpr.metadata.data_filepath);
         };
 
         // Run each step sequentially
@@ -1850,7 +1859,7 @@ mod tests {
             antenna_separation: 1.,
             time_window: 2000.,
             last_trace: n_traces as u32,
-            rd3_filepath: std::path::PathBuf::new(),
+            data_filepath: std::path::PathBuf::new(),
             medium_velocity: 0.167,
         };
 
@@ -1941,7 +1950,7 @@ mod tests {
             antenna_separation: 2.,
             time_window: 500.,
             last_trace: width.unwrap_or(2048) as u32,
-            rd3_filepath: PathBuf::new(),
+            data_filepath: PathBuf::new(),
             medium_velocity: 0.168,
         }
     }

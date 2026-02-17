@@ -78,7 +78,7 @@ pub fn load_rad(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta, B
             .ok_or("No 'LAST TRACE' key in metadata")?
             .trim()
             .parse()?,
-        rd3_filepath,
+        data_filepath: rd3_filepath,
         medium_velocity,
     })
 }
@@ -209,8 +209,11 @@ pub fn load_rd3(filepath: &Path, height: usize) -> Result<Array2<f32>, Box<dyn s
     Ok(ndarray::Array2::from_shape_vec((width, height), data)?.reversed_axes())
 }
 
-
-pub fn load_pe_dt1(filepath: &Path, height: usize, width: usize) -> Result<Array2<f32>, Box<dyn std::error::Error>> {
+pub fn load_pe_dt1(
+    filepath: &Path,
+    height: usize,
+    width: usize,
+) -> Result<Array2<f32>, Box<dyn std::error::Error>> {
     let bytes = std::fs::read(filepath)?;
 
     const TRACE_HEADER_BYTES: usize = 25 * 4 + 28; // 128
@@ -227,7 +230,8 @@ pub fn load_pe_dt1(filepath: &Path, height: usize, width: usize) -> Result<Array
             "File too short: got {} bytes, expected at least {} bytes",
             bytes.len(),
             expected_len
-        ).into());
+        )
+        .into());
     }
 
     let mut data: Vec<f32> = Vec::with_capacity(height * width);
@@ -249,8 +253,7 @@ pub fn load_pe_dt1(filepath: &Path, height: usize, width: usize) -> Result<Array
     }
 
     Ok(Array2::from_shape_vec((width, height), data)?.reversed_axes())
-
-} 
+}
 
 pub fn load_pe_hd(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta, Box<dyn Error>> {
     let content = std::fs::read_to_string(filepath)?;
@@ -259,18 +262,17 @@ pub fn load_pe_hd(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta,
     let mut data = HashMap::<&str, &str>::new();
     for (key, value) in content.lines().filter_map(|s| s.split_once('=')) {
         data.insert(key.trim(), value.trim());
-
-
     }
     let samples: u32 = data
-            .get("NUMBER OF PTS/TRC")
-            .ok_or("No 'NUMBER OF PTS/TRC' key in metadata")?
-            .trim()
-            .parse()?;
-    let time_window: f32 = data.get("TOTAL TIME WINDOW")
-            .ok_or("No 'TOTAL TIME WINDOW' key in metadata")?
-            .trim()
-            .parse()?;
+        .get("NUMBER OF PTS/TRC")
+        .ok_or("No 'NUMBER OF PTS/TRC' key in metadata")?
+        .trim()
+        .parse()?;
+    let time_window: f32 = data
+        .get("TOTAL TIME WINDOW")
+        .ok_or("No 'TOTAL TIME WINDOW' key in metadata")?
+        .trim()
+        .parse()?;
 
     let frequency = 1000. * (samples as f32) / time_window;
 
@@ -278,8 +280,8 @@ pub fn load_pe_hd(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta,
     if !dt1_filepath.is_file() {
         return Err(format!("File not found: {dt1_filepath:?}").into());
     };
-        
-    Ok(gpr::GPRMeta{
+
+    Ok(gpr::GPRMeta {
         samples,
         frequency: frequency,
         frequency_steps: 0,
@@ -297,7 +299,8 @@ pub fn load_pe_hd(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta,
             .get("NOMINAL FREQUENCY")
             .ok_or("No 'NOMINAL FREQUENCY' key in metadata")?
             .replace(' ', "")
-            .parse::<String>()? + " MHz",
+            .parse::<String>()?
+            + " MHz",
         antenna_separation: data
             .get("ANTENNA SEPARATION")
             .ok_or("No 'ANTENNA SEPARATION' key in metadata")?
@@ -309,16 +312,15 @@ pub fn load_pe_hd(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta,
             .ok_or("No 'NUMBER OF TRACES' key in metadata")?
             .trim()
             .parse()?,
-        rd3_filepath: dt1_filepath,
+        data_filepath: dt1_filepath,
         medium_velocity,
     })
-
-
 }
 
 fn read_gga(gga_str: &str, date: &str) -> Result<(f64, crate::coords::Coord, f64), Box<dyn Error>> {
-
-    let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
     let mut date = date.to_string();
     for (i, month) in months.iter().enumerate() {
         date = date.replace(month, &format!("{:02}", (i + 1)));
@@ -340,7 +342,7 @@ fn read_gga(gga_str: &str, date: &str) -> Result<(f64, crate::coords::Coord, f64
         lon *= -1.;
     }
 
-    let coord = crate::coords::Coord{x: lon, y: lat};
+    let coord = crate::coords::Coord { x: lon, y: lat };
 
     let elev = parts.get(9).unwrap().parse::<f64>()?;
 
@@ -354,11 +356,9 @@ fn read_gga(gga_str: &str, date: &str) -> Result<(f64, crate::coords::Coord, f64
         chrono::DateTime::parse_from_rfc3339(&format!("{}T{}:{}:{}+00:00", date, hr, min, sec))?
             .timestamp() as f64;
 
-    
     // panic!("{lat} {lon} {elev} {datetime}");
-    
-    Ok((datetime, coord, elev))
 
+    Ok((datetime, coord, elev))
 }
 
 pub fn load_pe_gp2(
@@ -374,12 +374,11 @@ pub fn load_pe_gp2(
     let mut points: Vec<gpr::CorPoint> = Vec::new();
     // Loop over the lines of the file and parse CorPoints from it
     for line in content.lines() {
-
         if line.starts_with(";") | line.starts_with("traces") {
             if line.contains("Date=") {
                 date_str = Some(line.split_once("=").unwrap().1.split_once(" ").unwrap().0);
             }
-            continue
+            continue;
         };
 
         let data: Vec<&str> = line.splitn(5, ",").collect();
@@ -387,7 +386,7 @@ pub fn load_pe_gp2(
         let trace_n = (data[0].parse::<i64>()? - 1) as u32; // The ".cor"-files are 1-indexed whereas this is 0-indexed
 
         if points.last().map(|p| Some(p.trace_n == trace_n)).flatten() == Some(true) {
-            continue
+            continue;
         }
 
         // if let Some(&last) = points.last() {
@@ -418,7 +417,6 @@ pub fn load_pe_gp2(
             northing: 0.,
             altitude,
         });
-
     }
     if points.is_empty() {
         return Err(format!("Could not parse location data from: {:?}", filepath).into());
@@ -448,7 +446,6 @@ pub fn load_pe_gp2(
     } else {
         Err(format!("Could not parse location data from: {:?}", filepath).into())
     }
-
 }
 
 /// Export a GPR profile and its metadata to a NetCDF (".nc") file.
@@ -505,7 +502,7 @@ pub fn export_netcdf(gpr: &gpr::GPR, nc_filepath: &Path) -> Result<(), Box<dyn s
     file.add_attribute(
         "original-filename",
         gpr.metadata
-            .rd3_filepath
+            .data_filepath
             .file_name()
             .unwrap()
             .to_str()
@@ -881,7 +878,7 @@ mod tests {
         assert_eq!(gpr_meta.antenna_separation, 0.5);
         assert_eq!(gpr_meta.time_window, 2000.);
         assert_eq!(gpr_meta.last_trace, 40);
-        assert_eq!(gpr_meta.rd3_filepath, rd3_path);
+        assert_eq!(gpr_meta.data_filepath, rd3_path);
     }
 
     #[test]
@@ -931,14 +928,14 @@ mod tests {
 
         // Check that the correct values were parsed
         assert_eq!(gpr_meta.samples, 1625);
-        assert_eq!(gpr_meta.frequency, 650. / 1625.);
+        assert_eq!(gpr_meta.frequency, 1000. * 1625. / 650.);
         // assert_eq!(gpr_meta.frequency_steps, 20);
         assert_eq!(gpr_meta.time_interval, 0.2);
         assert_eq!(gpr_meta.antenna_mhz, 200.);
         assert_eq!(gpr_meta.antenna_separation, 1.);
         assert_eq!(gpr_meta.time_window, 650.);
         assert_eq!(gpr_meta.last_trace, 9896);
-        assert_eq!(gpr_meta.rd3_filepath, rd3_path);
+        assert_eq!(gpr_meta.data_filepath, rd3_path);
     }
 
     #[test]
