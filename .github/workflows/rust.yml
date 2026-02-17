@@ -34,7 +34,7 @@ jobs:
         shell: powershell
         run: |
           choco install -y gdal
-          choco install -y proj
+          # choco install -y proj
 
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
