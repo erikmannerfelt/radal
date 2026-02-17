@@ -24,11 +24,12 @@ repos:
 #   hooks:
 #   - id: beautysh
 
-- repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
-  rev: v2.13.0
-  hooks:
-  - id: pretty-format-yaml
-    args: [--autofix, --indent, '2']
+# Does not work as of 2026-02-17
+# - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+#   rev: v2.13.0
+#   hooks:
+#   - id: pretty-format-yaml
+#     args: [--autofix, --indent, '2']
 - repo: https://github.com/nix-community/nixpkgs-fmt
   rev: v1.3.0
   hooks:
