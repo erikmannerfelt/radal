@@ -687,12 +687,7 @@ impl GPR {
         location: GPRLocation,
         metadata: GPRMeta,
     ) -> Result<GPR, Box<dyn Error>> {
-        let data = match metadata
-            .data_filepath
-            .extension()
-            .map(|s| s.to_str())
-            .flatten()
-        {
+        let data = match metadata.data_filepath.extension().and_then(|s| s.to_str()) {
             Some("rd3") => Ok(io::load_rd3(
                 &metadata.data_filepath,
                 metadata.samples as usize,
@@ -1514,7 +1509,10 @@ pub fn run(params: RunParams) -> Result<Vec<GPR>, Box<dyn Error>> {
     let empty: Vec<GPR> = Vec::new();
     let mut gprs: Vec<(PathBuf, GPR)> = Vec::new();
     for filepath in &params.filepaths {
-        let ext = filepath.extension().map(|s| s.to_str()).flatten().unwrap();
+        let ext = filepath
+            .extension()
+            .and_then(|s| s.to_str())
+            .ok_or(format!("Extension-less filepath: {:?}", filepath).to_string())?;
 
         let (gpr_meta, mut gpr_locations) = if ["hd", "dt1"].contains(&ext) {
             let hd_filepath = filepath.with_extension("hd");

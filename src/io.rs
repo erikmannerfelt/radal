@@ -283,7 +283,7 @@ pub fn load_pe_hd(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta,
 
     Ok(gpr::GPRMeta {
         samples,
-        frequency: frequency,
+        frequency,
         frequency_steps: 0,
         time_interval: data
             .get("TRACE INTERVAL (s)")
@@ -385,7 +385,7 @@ pub fn load_pe_gp2(
 
         let trace_n = (data[0].parse::<i64>()? - 1) as u32; // The ".cor"-files are 1-indexed whereas this is 0-indexed
 
-        if points.last().map(|p| Some(p.trace_n == trace_n)).flatten() == Some(true) {
+        if points.last().map(|p| p.trace_n == trace_n) == Some(true) {
             continue;
         }
 
