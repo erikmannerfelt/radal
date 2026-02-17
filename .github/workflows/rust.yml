@@ -11,20 +11,38 @@ env:
 
 jobs:
   build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
 
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Install dependencies
-      run: |
-        sudo apt update -y
-        sudo apt install -y gdal-bin proj-bin
-    - name: Formatting
-      run: cargo fmt --check
-    - name: Build
-      run: cargo build --verbose
-    - name: Linting
-      run: cargo clippy -- -Dwarnings --no-deps
-    - name: Run tests
-      run: cargo test -- --nocapture
+      - uses: actions/checkout@v3
+
+      # OS-specific dependencies
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update -y
+          sudo apt install -y gdal-bin proj-bin
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # Only Linux: formatting & linting
+      - name: Formatting
+        if: runner.os == 'Linux'
+        run: cargo fmt --check
+
+      - name: Linting
+        if: runner.os == 'Linux'
+        run: cargo clippy -- -D warnings --no-deps
+
+      # Both Linux and Windows: build & test
+      - name: Build
+        run: cargo build --verbose
+
+      - name: Run tests
+        run: cargo test -- --nocapture
