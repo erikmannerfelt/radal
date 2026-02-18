@@ -42,7 +42,7 @@ pub fn average_traces<T: Float + FromPrimitive>(
         ));
     }
 
-    let new_ncols = (ncols + window - 1) / window;
+    let new_ncols = ncols.div_ceil(window);
 
     let mut averaged = Array2::<T>::zeros((nrows, new_ncols));
 
@@ -78,7 +78,7 @@ pub fn window_subset_vec<T>(mut v: Vec<T>, window: usize) -> Vec<T> {
         return Vec::new();
     }
 
-    let n_windows = (len + window - 1) / window;
+    let n_windows = len.div_ceil(window);
     let mut new_vec = Vec::with_capacity(n_windows);
 
     // Compute the indices of the elements we want to keep
