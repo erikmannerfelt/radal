@@ -453,7 +453,12 @@ impl GPR {
                     false => Err(e),
                 },
             }?;
-            *self = self.subset(min_trace, max_trace, min_sample, max_sample);
+            *self = self.subset(min_trace, max_trace, min_sample, max_sample)?;
+        } else if step_name.contains("average_traces") {
+            let window: usize = tools::parse_option(step_name, 0)?
+                .ok_or("Must provide an averaging window to average_traces".to_string())?;
+
+            self.average_traces(window)?;
         } else if step_name.contains("unphase") {
             self.unphase();
         } else if step_name.contains("abslog") {
@@ -618,7 +623,7 @@ impl GPR {
         max_trace: Option<u32>,
         min_sample: Option<u32>,
         max_sample: Option<u32>,
-    ) -> GPR {
+    ) -> Result<GPR, String> {
         let start_time = SystemTime::now();
         let min_trace_ = min_trace.unwrap_or(0);
         let max_trace_ = match max_trace {
@@ -630,6 +635,21 @@ impl GPR {
             Some(x) => x,
             None => self.height() as u32,
         };
+
+        let checks = [
+            (min_trace_, self.width(), "min trace number"),
+            (max_trace_, self.width(), "max trace number"),
+            (min_sample_, self.height(), "min sample number"),
+            (max_sample_, self.height(), "max sample number"),
+        ];
+
+        for (val, maxval, desc) in checks {
+            if val > maxval as u32 {
+                return Err(format!(
+                    "Subset failed: {desc} ({val}) out of the dataset bounds ({maxval})"
+                ));
+            }
+        }
 
         let data_subset = self
             .data
@@ -676,7 +696,7 @@ impl GPR {
             start_time,
         );
 
-        new_gpr
+        Ok(new_gpr)
     }
 
     pub fn vertical_resolution_ns(&self) -> f32 {
@@ -1398,6 +1418,31 @@ impl GPR {
 
         Ok(())
     }
+
+    pub fn average_traces(&mut self, window: usize) -> Result<(), String> {
+        let start_time = SystemTime::now();
+
+        let initial_width = self.width();
+        let averaged_data = filters::average_traces(&self.data, window)?;
+
+        if let Some(topo_data) = &self.topo_data {
+            self.topo_data = Some(filters::average_traces(topo_data, window)?);
+        }
+
+        self.location.cor_points =
+            filters::window_subset_vec(self.location.cor_points.clone(), window);
+        self.metadata.time_interval *= window as f32;
+
+        self.update_data(averaged_data);
+
+        self.log_event(
+            "average_traces",
+            &format!("Averaged traces in a window={window}. Reduced trace number from {initial_width} to {}", self.width()),
+            start_time,
+        );
+
+        Ok(())
+    }
     // Remove all traces whose absolute mean is lower than the given "strength"
     pub fn remove_empty_traces(&mut self, strength: f32) -> Result<(), String> {
         let start_time = SystemTime::now();
@@ -1759,6 +1804,7 @@ pub fn all_available_steps() -> Vec<[&'static str; 2]> {
         ["subset", "Subset the data in x (traces) and/or y (samples). Examples: Clip to the first 500 samples: subset(0 -1 0 500). Clip to the first 300 traces, subset(0 300)"],
         ["remove_traces", "Manually remove trace indices, for example in case they are visually deemed bad. Example: Remove the first two traces: remove_traces(0 1)"],
         ["remove_empty_traces", "Remove all traces that appear empty. Recommended to be run as the first filter if required!. The strength threshold (mean absolute trace value) can be tweaked. Example: 'remove_empty_traces(2)'. Default: 1."],
+        ["average_traces", "Average traces in a given window. The coordinate information is picked from the middle averaged trace. Example: 'average_traces(3)'."],
         ["zero_corr_max_peak", "Shift the location of the zero return time by finding the maximum row value. The peak is found for each trace individually."],
         ["zero_corr", "Shift the location of the zero return time by finding the first row where data appear. The correction can be tweaked to allow more or less data, e.g. 'zero_corr(0.9)'. Default: 1.0"],
         ["bandpass", "Apply a bandpass Butterworth filter to each trace individually. The given frequencies are normalized (0: 0Hz, 1: Nyquist). An optional strength (q) can be provided as a third argument (default 0.707). Default: bandpass(0.1 0.9)"],
