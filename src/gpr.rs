@@ -453,7 +453,7 @@ impl GPR {
                     false => Err(e),
                 },
             }?;
-            *self = self.subset(min_trace, max_trace, min_sample, max_sample);
+            *self = self.subset(min_trace, max_trace, min_sample, max_sample)?;
         } else if step_name.contains("average_traces") {
             let window: usize = tools::parse_option(step_name, 0)?
                 .ok_or("Must provide an averaging window to average_traces".to_string())?;
@@ -623,7 +623,7 @@ impl GPR {
         max_trace: Option<u32>,
         min_sample: Option<u32>,
         max_sample: Option<u32>,
-    ) -> GPR {
+    ) -> Result<GPR, String> {
         let start_time = SystemTime::now();
         let min_trace_ = min_trace.unwrap_or(0);
         let max_trace_ = match max_trace {
@@ -635,6 +635,21 @@ impl GPR {
             Some(x) => x,
             None => self.height() as u32,
         };
+
+        let checks = [
+            (min_trace_, self.width(), "min trace number"),
+            (max_trace_, self.width(), "max trace number"),
+            (min_sample_, self.height(), "min sample number"),
+            (max_sample_, self.height(), "max sample number"),
+        ];
+
+        for (val, maxval, desc) in checks {
+            if val > maxval as u32 {
+                return Err(format!(
+                    "Subset failed: {desc} ({val}) out of the dataset bounds ({maxval})"
+                ));
+            }
+        }
 
         let data_subset = self
             .data
@@ -681,7 +696,7 @@ impl GPR {
             start_time,
         );
 
-        new_gpr
+        Ok(new_gpr)
     }
 
     pub fn vertical_resolution_ns(&self) -> f32 {
