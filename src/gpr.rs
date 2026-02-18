@@ -1411,7 +1411,7 @@ impl GPR {
         let averaged_data = filters::average_traces(&self.data, window)?;
 
         if let Some(topo_data) = &self.topo_data {
-            self.topo_data = Some(filters::average_traces(&topo_data, window)?);
+            self.topo_data = Some(filters::average_traces(topo_data, window)?);
         }
 
         self.location.cor_points =
