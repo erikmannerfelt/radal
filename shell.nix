@@ -15,6 +15,7 @@ pkgs.mkShell {
     proj
     gdal
     netcdf
+    maturin
   ];
 
   shellHook = ''

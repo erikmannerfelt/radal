@@ -22,6 +22,7 @@ pkgs.rustPlatform.buildRustPackage rec {
     gnumake
     clang
     zlib
+    maturin
   ];
   buildInputs = with pkgs; [ proj my-gdal ];
 
