@@ -53,12 +53,12 @@ jobs:
       # Install the just-built wheel and run tests
       - name: Install built wheel
         run: |
-          pip install --force-reinstall --no-index --find-links target/wheels rsgpr
+          pip install --force-reinstall --no-index --find-links target/wheels radal
 
       - name: Run tests
         run: |
           # simple smoke test: import and print version
-          python -c "import rsgpr; print(rsgpr.version);"
+          python -c "import radal; print(radal.version);"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4

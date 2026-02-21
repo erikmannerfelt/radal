@@ -1,15 +1,14 @@
-//! # rsgpr  --- "rust GPR" or "really simple GPR" or "`rsgpr` simplifies GPR"
+//! # radal  --- Speeding up Ground Penetrating Radar (GPR) processing
 //! A Ground Penetrating Radar (GPR) processing tool written in rust.
 //!
-//! **This is a WIP and may still have significant bugs.**
+//! **This is a WIP.**
 //!
-//! The main aims of `rsgpr` are:
+//! The main aims of `radal` are:
 //! - **Ease of use**: A command line interface to process data or batches of data in one command.
 //! - **Transparency**: All code is (or will be) thoroughly documented to show exactly how the data are modified.
-//! - **Low memory usage and high speed**: While data are processed in-memory, they are usually no larger than an image (say 4000x2000 px). The functions of `rsgpr` avoid copying as much as possible, to keep memory usage to a minimum. Wherever possible, it is also multithreaded for fast processing times.
+//! - **Low memory usage and high speed**: While data are processed in-memory, they are usually no larger than an image (say 4000x2000 px). The functions of `radal` avoid copying as much as possible, to keep memory usage to a minimum. Wherever possible, it is also multithreaded for fast processing times.
 //! - **Reliability**: All functions will be tested in CI, meaning no crash or invalid behaviour should occur.
 //!
-//! Thank you, creators of [rgpr](https://github.com/emanuelhuber/RGPR) for the inspiration for this project.
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
@@ -30,7 +29,7 @@ const PROGRAM_AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 
 #[cfg(feature = "python")]
 #[pymodule]
-pub mod rsgpr {
+pub mod radal {
     use crate::{cli, gpr};
     use pyo3::prelude::*;
     use std::path::PathBuf;
