@@ -3,6 +3,8 @@ name = "radal"
 version = "0.4.2"
 edition = "2021"
 readme = "README.md"
+description="Speeding up Ground Penetrating Radar (GPR) processing"
+license-file="LICENSE"
 
 authors = ["Erik Schytt Mannerfelt"]
 
