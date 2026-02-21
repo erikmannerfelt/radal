@@ -1,9 +1,10 @@
 # Radal — Speeding up Ground Penetrating Radar (GPR) processing
 The aim of `radal` is to quickly and accurately process GPR data.
 In one command, most data can be processed in pre-set profiles or with custom filter settings, and batch modes allow for sequences of datasets to be processed with the same settings.
-Radal is a high-performance ground-penetrating radar (GPR) processing software.
-The aim is to make GPR data easy to process and handle.
-Built in [rust](https://rust-lang.org/) with high focus on testing and performance, Radal may be for you if large data volumes and strange fileformats are common issues.
+Built in [rust](https://rust-lang.org/) with a high focus on testing and performance, `radal` may be for you if large data volumes and strange fileformats are common issues.
+
+The name is a take on the loosely defined "Data Abstraction Library" (DAL) projects like [GDAL](https://gdal.org) and [PDAL](https://pdal.org), but for radar.
+A near-term goal of Radal is to enable easy translation between formats, such as `radal translate input.rad output.dzt` (this is not yet implemented).
 
 
 Much of the functionality has been inspired from the projects [RGPR](https://github.com/emanuelhuber/RGPR) and [ImpDAR](https://github.com/dlilien/ImpDAR); both of which are more mature projects.
@@ -69,3 +70,11 @@ radal -f "data/*.rd3" --merge "10 min" --default -o output/
 
 A rudimentary profile renderer is available with the `-r` argument.
 This will be saved in the same location as the output file as a JPG if another filename is not given.
+
+
+## Papers using Radal
+
+- [Kleber et al. (2023): Groundwater springs formed during glacial retreat are a large source of methane in the high Arctic](https://doi.org/10.1038/s41561-023-01210-6)
+- [Harcourt et al. (2026): Surging glaciers in Svalbard: Observing their distribution, characteristics and evolution](https://doi.org/10.1016/j.earscirev.2026.105410)
+
+... and many others in preparation/review
