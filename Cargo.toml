@@ -1,5 +1,5 @@
 [package]
-name = "rsgpr"
+name = "radal"
 version = "0.4.2"
 edition = "2021"
 readme = "README.md"
@@ -7,12 +7,12 @@ readme = "README.md"
 authors = ["Erik Schytt Mannerfelt"]
 
 [lib]
-name = "rsgpr"
+name = "radal"
 crate-type = ["cdylib"]
 path = "src/lib.rs"
 
 [[bin]]
-name = "rsgpr"
+name = "radal"
 path = "src/main.rs"
 
 [dependencies]

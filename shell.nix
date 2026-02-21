@@ -20,6 +20,6 @@ pkgs.mkShell {
 
   shellHook = ''
     ${pkgs.zsh}/bin/zsh
-    alias rsgpr="$(pwd)/target/debug/rsgpr";
+    alias radal="$(pwd)/target/release/radal";
   '';
 }

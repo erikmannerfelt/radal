@@ -3,12 +3,11 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "rsgpr"
+name = "radal"
 requires-python = ">=3.8"
 
 [tool.maturin]
 # Bindings type
 bindings = "pyo3"
 features = ["python"]
-# and optionally:
 default-features = false
