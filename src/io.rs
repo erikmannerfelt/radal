@@ -12,6 +12,7 @@ use crate::{gpr, tools};
 /// # Arguments
 /// - `filepath`: The filepath of the input metadata file
 /// - `medium_velocity`: The velocity of the portrayed medium to assign the GPR data
+/// - `override_antenna_mhz`: Optional antenna frequency override (will not read from metadata).
 ///
 /// # Returns
 /// A gpr::GPRMeta instance.
@@ -20,8 +21,13 @@ use crate::{gpr, tools};
 /// - The file could not be read
 /// - The contents could not be parsed correctly
 /// - The associated ".rd3" file does not exist.
-pub fn load_rad(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta, Box<dyn Error>> {
-    let content = std::fs::read_to_string(filepath)?;
+pub fn load_rad(
+    filepath: &Path,
+    medium_velocity: f32,
+    override_antenna_mhz: Option<f32>,
+) -> Result<gpr::GPRMeta, Box<dyn Error>> {
+    let bytes = std::fs::read(Path::new(filepath))?; // read as raw bytes
+    let content = String::from_utf8_lossy(&bytes); // &str with invalid bytes replaced
 
     // Collect all rows into a hashmap, assuming a "KEY:VALUE" structure.
     let data: HashMap<&str, &str> = content.lines().filter_map(|s| s.split_once(':')).collect();
@@ -37,6 +43,16 @@ pub fn load_rad(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta, B
         .ok_or("No 'ANTENNAS' key in metadata")?
         .trim()
         .to_string();
+
+    let antenna_mhz = match override_antenna_mhz {
+        Some(v) => v,
+        None => antenna.split("MHz").collect::<Vec<&str>>()[0]
+            .trim()
+            .parse::<f32>()
+            .map_err(|e| {
+                format!("Could not read frequency from the antenna field ({e:?}). Try using the antenna MHz override")
+            })?
+    };
 
     Ok(gpr::GPRMeta {
         samples: data
@@ -59,9 +75,7 @@ pub fn load_rad(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta, B
             .ok_or("No 'TIME INTERVAL' key in metadata")?
             .replace(' ', "")
             .parse()?,
-        antenna_mhz: antenna.split("MHz").collect::<Vec<&str>>()[0]
-            .trim()
-            .parse()?,
+        antenna_mhz,
         antenna,
         antenna_separation: data
             .get("ANTENNA SEPARATION")
@@ -128,15 +142,19 @@ pub fn load_cor(
             longitude *= -1.;
         };
 
+        // Parse the date and time columns into datetime, then convert to seconds after UNIX epoch.
+        let datetime_try =
+            chrono::DateTime::parse_from_rfc3339(&format!("{}T{}+00:00", data[1], data[2]));
+        // In some odd cases, the time information is wrong. Those lines should b eskipped
+        if datetime_try.is_err() {
+            continue;
+        }
+        let datetime = datetime_try?.timestamp() as f64;
+
         coords.push(crate::coords::Coord {
             x: longitude,
             y: latitude,
         });
-
-        // Parse the date and time columns into datetime, then convert to seconds after UNIX epoch.
-        let datetime =
-            chrono::DateTime::parse_from_rfc3339(&format!("{}T{}+00:00", data[1], data[2]))?
-                .timestamp() as f64;
 
         // Coordinates are 0 right now. That's fixed right below
         points.push(gpr::CorPoint {
@@ -255,7 +273,11 @@ pub fn load_pe_dt1(
     Ok(Array2::from_shape_vec((width, height), data)?.reversed_axes())
 }
 
-pub fn load_pe_hd(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta, Box<dyn Error>> {
+pub fn load_pe_hd(
+    filepath: &Path,
+    medium_velocity: f32,
+    override_antenna_mhz: Option<f32>,
+) -> Result<gpr::GPRMeta, Box<dyn Error>> {
     let content = std::fs::read_to_string(filepath)?;
 
     // Collect all rows into a hashmap, assuming a "KEY:VALUE" structure.
@@ -281,6 +303,18 @@ pub fn load_pe_hd(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta,
         return Err(format!("File not found: {dt1_filepath:?}").into());
     };
 
+    let antenna_mhz = match override_antenna_mhz {
+        Some(v) => v,
+        None => data
+            .get("NOMINAL FREQUENCY")
+            .ok_or("No 'NOMINAL FREQUENCY' key in metadata")?
+            .replace(' ', "")
+            .parse()
+            .map_err(|e| {
+                format!("Could not read frequency from the 'NOMINAL FREQUENCY' field ({e:?}). Try using the antenna MHz override")
+            })?
+    };
+
     Ok(gpr::GPRMeta {
         samples,
         frequency,
@@ -290,11 +324,7 @@ pub fn load_pe_hd(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta,
             .ok_or("No 'TRACE INTERVAL (s)' key in metadata")?
             .replace(' ', "")
             .parse()?,
-        antenna_mhz: data
-            .get("NOMINAL FREQUENCY")
-            .ok_or("No 'NOMINAL FREQUENCY' key in metadata")?
-            .replace(' ', "")
-            .parse()?,
+        antenna_mhz,
         antenna: data
             .get("NOMINAL FREQUENCY")
             .ok_or("No 'NOMINAL FREQUENCY' key in metadata")?
@@ -795,6 +825,9 @@ mod tests {
             "1\t2022-01-01\t00:00:01\t78.0\tN\t16.0\tE\t100.0\tM\t1",
             "10\t2022-01-01\t00:01:00\t78.0\tS\t16.0\tW\t100.0\tM\t1",
             "11\t2022-01", // This simulates an unfinished line that should be skipped
+            "000000\tN\t17.433201666667\tE\t332.20\tM\t2.00", // Another bad line that should be skipped
+            "9673\t2011-05-07\t18:95\t79.89\tN\t23.88\tE\t722.1317\tM\t0.62", // Bad time
+            "14897\t2010-05-05\t1.:00:\t79.793\tN\t23.32\tE\t692.8199\tM\t0.58", // Another bad time
         ]
         .join("\r\n")
     }
@@ -809,6 +842,8 @@ mod tests {
 
         // Load it and "convert" (or rather don't convert) the CRS to WGS84
         let locations = load_cor(&cor_path, Some(&"EPSG:4326".to_string())).unwrap();
+
+        assert_eq!(locations.cor_points.len(), 2);
 
         // Check that the trace number is now zero based, and that the other fields were read
         // correctly
@@ -868,7 +903,7 @@ mod tests {
         // The rd3 file needs to exist, but it doesn't need to contain anything
         std::fs::write(&rd3_path, "").unwrap();
 
-        let gpr_meta = load_rad(&rad_path, 0.1).unwrap();
+        let gpr_meta = load_rad(&rad_path, 0.1, None).unwrap();
 
         // Check that the correct values were parsed
         assert_eq!(gpr_meta.samples, 2024);
@@ -880,6 +915,48 @@ mod tests {
         assert_eq!(gpr_meta.time_window, 2000.);
         assert_eq!(gpr_meta.last_trace, 40);
         assert_eq!(gpr_meta.data_filepath, rd3_path);
+
+        // Test overriding the antenna frequency
+        let gpr_meta = load_rad(&rad_path, 0.1, Some(200.)).unwrap();
+        assert_eq!(gpr_meta.antenna_mhz, 200.);
+    }
+
+    #[test]
+    fn test_load_rad_bad_antenna_mhz() {
+        // Fake a .rad metadata file
+        let temp_dir = tempfile::tempdir().unwrap();
+        let rad_path = temp_dir.path().join("hello.rad");
+        let rd3_path = rad_path.with_extension("rd3");
+        let rad_text = [
+            "SAMPLES:2024",
+            "FREQUENCY:                 1000.",
+            "FREQUENCY STEPS: 20",
+            "TIME INTERVAL: 0.1",
+            "ANTENNAS: onehundredmegaherzz unshielded",
+            "ANTENNA SEPARATION: 0.5",
+            "TIMEWINDOW:2000",
+            "LAST TRACE: 40",
+        ]
+        .join("\r\n");
+
+        std::fs::write(&rad_path, rad_text).unwrap();
+
+        // The rd3 file needs to exist, but it doesn't need to contain anything
+        std::fs::write(&rd3_path, "").unwrap();
+
+        // This should return an error
+        let gpr_meta_fail = load_rad(&rad_path, 0.1, None);
+        assert!(gpr_meta_fail.is_err());
+
+        let err_msg = gpr_meta_fail.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("frequency from the antenna field"),
+            "Got:     {err_msg:?}\nExpected 'Could not read frequency from the antenna field'",
+        );
+        assert!(load_rad(&rad_path, 0.1, None).is_err());
+
+        let gpr_meta = load_rad(&rad_path, 0.1, Some(100.)).unwrap();
+        assert_eq!(gpr_meta.antenna_mhz, 100.);
     }
 
     #[test]
@@ -926,7 +1003,7 @@ mod tests {
         // The rd3 file needs to exist, but it doesn't need to contain anything
         std::fs::write(&rd3_path, "").unwrap();
 
-        let gpr_meta = crate::io::load_pe_hd(&rad_path, 0.1).unwrap();
+        let gpr_meta = crate::io::load_pe_hd(&rad_path, 0.1, None).unwrap();
 
         // Check that the correct values were parsed
         assert_eq!(gpr_meta.samples, 1625);
@@ -938,6 +1015,10 @@ mod tests {
         assert_eq!(gpr_meta.time_window, 650.);
         assert_eq!(gpr_meta.last_trace, 9896);
         assert_eq!(gpr_meta.data_filepath, rd3_path);
+
+        // Test overriding the antenna frequency
+        let gpr_meta = crate::io::load_pe_hd(&rad_path, 0.1, Some(300.)).unwrap();
+        assert_eq!(gpr_meta.antenna_mhz, 300.);
     }
 
     #[test]

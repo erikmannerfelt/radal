@@ -1548,6 +1548,7 @@ pub struct RunParams {
     pub no_export: bool,
     pub render_path: Option<Option<PathBuf>>,
     pub merge: Option<Duration>,
+    pub override_antenna_mhz: Option<f32>,
 }
 
 pub fn run(params: RunParams) -> Result<Vec<GPR>, Box<dyn Error>> {
@@ -1571,7 +1572,11 @@ pub fn run(params: RunParams) -> Result<Vec<GPR>, Box<dyn Error>> {
                 return Err(format!("File not found: {:?}", hd_filepath).into());
             };
 
-            let gpr_meta = io::load_pe_hd(&hd_filepath, params.medium_velocity)?;
+            let gpr_meta = io::load_pe_hd(
+                &hd_filepath,
+                params.medium_velocity,
+                params.override_antenna_mhz,
+            )?;
 
             let gpr_locations =
                 io::load_pe_gp2(&filepath.with_extension("gp2"), params.crs.as_ref())?;
@@ -1591,7 +1596,11 @@ pub fn run(params: RunParams) -> Result<Vec<GPR>, Box<dyn Error>> {
                 return Err(format!("File not found: {:?}", rad_filepath).into());
             };
             // Load the GPR metadata from the rad file
-            let gpr_meta = io::load_rad(&rad_filepath, params.medium_velocity)?;
+            let gpr_meta = io::load_rad(
+                &rad_filepath,
+                params.medium_velocity,
+                params.override_antenna_mhz,
+            )?;
 
             // Load the GPR location data
             // If the "--cor" argument was used, load from there. Otherwise, try to find a ".cor" file
