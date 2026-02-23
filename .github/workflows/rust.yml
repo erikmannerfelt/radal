@@ -3,6 +3,8 @@ name: Rust
 on:
   push:
     branches: [main]
+    tags:
+      - 'v*'
   pull_request:
     branches: [main]
 
@@ -11,17 +13,15 @@ env:
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
+    name: Build & test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      # OS-specific dependencies
       - name: Install dependencies (Ubuntu)
         if: runner.os == 'Linux'
         run: |
@@ -31,7 +31,6 @@ jobs:
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      # Only Linux: formatting & linting
       - name: Formatting
         if: runner.os == 'Linux'
         run: cargo fmt --check
@@ -40,9 +39,31 @@ jobs:
         if: runner.os == 'Linux'
         run: cargo clippy --bin radal -- -D warnings --no-deps
 
-      # Both Linux and Windows: build & test
       - name: Build
         run: cargo build --bin radal --verbose
 
-      - name: Run tests
+      - name: Test
         run: cargo test --bin radal -- --nocapture
+
+      # Dry‑run publish check (safe, no secrets)
+      - name: Dry-run cargo publish
+        if: runner.os == 'Linux' && !startsWith(github.ref, 'refs/tags/')
+        run: cargo publish --dry-run
+
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish crate
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish
+
