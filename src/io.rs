@@ -122,15 +122,19 @@ pub fn load_cor(
     // Loop over the lines of the file and parse CorPoints from it
     for line in content.lines() {
         // Split the line into ten separate columns.
-        let data: Vec<&str> = line.splitn(10, '\t').collect();
+        let data: Vec<&str> = line.split_whitespace().collect();
 
         // If the line could not be split in ten columns, it is probably wrong.
         if data.len() < 10 {
             continue;
         };
 
-        let mut latitude: f64 = data[3].parse()?;
-        let mut longitude: f64 = data[5].parse()?;
+        let Ok(mut latitude) = data[3].parse::<f64>() else {
+            continue;
+        };
+        let Ok(mut longitude) = data[5].parse::<f64>() else {
+            continue;
+        };
 
         // Invert the sign of the latitude if it's on the southern hemisphere
         if data[4].trim() == "S" {
@@ -143,13 +147,27 @@ pub fn load_cor(
         };
 
         // Parse the date and time columns into datetime, then convert to seconds after UNIX epoch.
-        let datetime_try =
-            chrono::DateTime::parse_from_rfc3339(&format!("{}T{}+00:00", data[1], data[2]));
         // In some odd cases, the time information is wrong. Those lines should b eskipped
-        if datetime_try.is_err() {
+        let Ok(datetime_obj) =
+            chrono::DateTime::parse_from_rfc3339(&format!("{}T{}+00:00", data[1], data[2]))
+        else {
             continue;
-        }
-        let datetime = datetime_try?.timestamp() as f64;
+        };
+        let datetime = datetime_obj.timestamp() as f64;
+
+        let Ok(altitude) = data[7].parse::<f64>() else {
+            continue;
+        };
+
+        // The ".cor"-files are 1-indexed whereas this is 0-indexed
+        let Ok(trace_n) = data[0].parse::<i64>().and_then(|v| Ok(v - 1)) else {
+            continue;
+        };
+
+        // If the trace number in the corfile is 0, then this will overflow
+        if trace_n < 0 {
+            continue;
+        };
 
         coords.push(crate::coords::Coord {
             x: longitude,
@@ -158,11 +176,11 @@ pub fn load_cor(
 
         // Coordinates are 0 right now. That's fixed right below
         points.push(gpr::CorPoint {
-            trace_n: (data[0].parse::<i64>()? - 1) as u32, // The ".cor"-files are 1-indexed whereas this is 0-indexed
+            trace_n: trace_n as u32,
             time_seconds: datetime,
             easting: 0.,
             northing: 0.,
-            altitude: data[7].parse()?,
+            altitude,
         });
     }
 
@@ -824,10 +842,12 @@ mod tests {
         [
             "1\t2022-01-01\t00:00:01\t78.0\tN\t16.0\tE\t100.0\tM\t1",
             "10\t2022-01-01\t00:01:00\t78.0\tS\t16.0\tW\t100.0\tM\t1",
+            "0\t2022-01-01\t00:01:00\t78.0\tS\t16.0\tW\t100.0\tM\t1", // Trace starts at 0 (bad)
             "11\t2022-01", // This simulates an unfinished line that should be skipped
             "000000\tN\t17.433201666667\tE\t332.20\tM\t2.00", // Another bad line that should be skipped
             "9673\t2011-05-07\t18:95\t79.89\tN\t23.88\tE\t722.1317\tM\t0.62", // Bad time
             "14897\t2010-05-05\t1.:00:\t79.793\tN\t23.32\tE\t692.8199\tM\t0.58", // Another bad time
+            "21584\t2010-05-05\t12:04:58   79.78905884333\tN 23.23301804333 E M 2        0.58.0592", // Bad elevation and mixed whitespace/tab
         ]
         .join("\r\n")
     }
@@ -843,6 +863,7 @@ mod tests {
         // Load it and "convert" (or rather don't convert) the CRS to WGS84
         let locations = load_cor(&cor_path, Some(&"EPSG:4326".to_string())).unwrap();
 
+        println!("{locations:?}");
         assert_eq!(locations.cor_points.len(), 2);
 
         // Check that the trace number is now zero based, and that the other fields were read
