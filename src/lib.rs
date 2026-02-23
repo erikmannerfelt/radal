@@ -20,11 +20,11 @@ mod gpr;
 mod io;
 mod tools;
 
-#[cfg(feature = "python")]
+#[allow(dead_code)] // For maturin
 const PROGRAM_VERSION: &str = env!("CARGO_PKG_VERSION");
-#[cfg(feature = "python")]
+#[allow(dead_code)] // For maturin
 const PROGRAM_NAME: &str = env!("CARGO_PKG_NAME");
-#[cfg(feature = "python")]
+#[allow(dead_code)] // For maturin
 const PROGRAM_AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 
 #[cfg(feature = "python")]
@@ -40,6 +40,50 @@ pub mod radal {
         m.add("__version__", crate::PROGRAM_VERSION)
     }
 
+    /// Call radal with the given arguments (identical to the CLI).
+    ///
+    /// Parameters
+    /// ----------
+    /// filepath
+    ///     Filepath of the header file or a glob pattern of many files
+    /// velocity
+    ///     Velocity of the medium in m/ns. Defaults to the typical velocity of ice.
+    /// info
+    ///     Only show metadata for the file
+    /// cor
+    ///     Load a separate ".cor" file. If not given, it will be searched for automatically
+    /// dem
+    ///     Correct elevation values with a DEM
+    /// crs
+    ///     Which coordinate reference system to project coordinates in.
+    /// track
+    ///     Export the location track to a comma separated values (CSV) file. Defaults to the output filename location and stem + "_track.csv"
+    /// default
+    ///     Process with the default profile. See "--show-default" to list the profile.
+    /// default_with_topo
+    ///     Process with the default profile plus topographic correction. See "--show-default" to list the profile.
+    /// show_default
+    ///     Show the default profile and exit
+    /// show_all_steps
+    ///     Show the available steps
+    /// steps
+    ///     Processing steps to run, separated by commas. Can be a filepath to a newline separated step file.
+    /// output
+    ///     Output filename or directory. Defaults to the input filename with a ".nc" extension
+    /// quiet
+    ///     Suppress progress messages
+    /// render
+    ///     Render an image of the profile and save it to the specified path. Defaults to a jpg in the directory of the output filepath
+    /// no_export
+    ///     Don't export a nc file
+    /// merge
+    ///     Merge profiles closer in time than the given threshold when in batch mode (e.g. "10 min")
+    /// override_antenna_mhz
+    ///     Override the antenna center frequency (in MHz) of the file metadata
+    ///
+    /// Returns
+    /// -------
+    /// The exit code of the CLI.
     #[pyfunction]
     #[pyo3(
         signature = (
