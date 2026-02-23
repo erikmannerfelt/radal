@@ -1,3 +1,10 @@
+[![PyPI](https://img.shields.io/pypi/v/radal.svg)](https://pypi.org/project/radal/)
+[![Crates.io](https://img.shields.io/crates/v/radal.svg)](https://crates.io/crates/radal)
+[![CI](https://github.com/erikmannerfelt/radal/actions/workflows/rust.yml/badge.svg)](
+https://github.com/erikmannerfelt/radal/actions/workflows/rust.yml
+)
+
+
 # Radal — Speeding up Ground Penetrating Radar (GPR) processing
 The aim of `radal` is to quickly and accurately process GPR data.
 In one command, most data can be processed in pre-set profiles or with custom filter settings, and batch modes allow for sequences of datasets to be processed with the same settings.
