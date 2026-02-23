@@ -160,7 +160,7 @@ pub fn load_cor(
         };
 
         // The ".cor"-files are 1-indexed whereas this is 0-indexed
-        let Ok(trace_n) = data[0].parse::<i64>().and_then(|v| Ok(v - 1)) else {
+        let Ok(trace_n) = data[0].parse::<i64>().map(|v| v - 1) else {
             continue;
         };
 
