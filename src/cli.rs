@@ -87,6 +87,10 @@ pub struct Args {
     /// Merge profiles closer in time than the given threshold when in batch mode (e.g. "10 min")
     #[clap(long)]
     pub merge: Option<String>,
+
+    /// Override the antenna center frequency (in MHz) of the file metadata
+    #[clap(long)]
+    pub override_antenna_mhz: Option<f32>,
 }
 
 pub enum CliAction {
@@ -180,6 +184,7 @@ pub fn args_to_action(args: &Args) -> CliAction {
         no_export: args.no_export,
         render_path: args.render.clone(),
         merge,
+        override_antenna_mhz: args.override_antenna_mhz,
     };
 
     CliAction::Run(params)

@@ -12,6 +12,7 @@ use crate::{gpr, tools};
 /// # Arguments
 /// - `filepath`: The filepath of the input metadata file
 /// - `medium_velocity`: The velocity of the portrayed medium to assign the GPR data
+/// - `override_antenna_mhz`: Optional antenna frequency override (will not read from metadata).
 ///
 /// # Returns
 /// A gpr::GPRMeta instance.
@@ -20,8 +21,13 @@ use crate::{gpr, tools};
 /// - The file could not be read
 /// - The contents could not be parsed correctly
 /// - The associated ".rd3" file does not exist.
-pub fn load_rad(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta, Box<dyn Error>> {
-    let content = std::fs::read_to_string(filepath)?;
+pub fn load_rad(
+    filepath: &Path,
+    medium_velocity: f32,
+    override_antenna_mhz: Option<f32>,
+) -> Result<gpr::GPRMeta, Box<dyn Error>> {
+    let bytes = std::fs::read(Path::new(filepath))?; // read as raw bytes
+    let content = String::from_utf8_lossy(&bytes); // &str with invalid bytes replaced
 
     // Collect all rows into a hashmap, assuming a "KEY:VALUE" structure.
     let data: HashMap<&str, &str> = content.lines().filter_map(|s| s.split_once(':')).collect();
@@ -59,9 +65,11 @@ pub fn load_rad(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta, B
             .ok_or("No 'TIME INTERVAL' key in metadata")?
             .replace(' ', "")
             .parse()?,
-        antenna_mhz: antenna.split("MHz").collect::<Vec<&str>>()[0]
-            .trim()
-            .parse()?,
+        antenna_mhz: override_antenna_mhz.unwrap_or(
+            antenna.split("MHz").collect::<Vec<&str>>()[0]
+                .trim()
+                .parse()?,
+        ),
         antenna,
         antenna_separation: data
             .get("ANTENNA SEPARATION")
@@ -255,7 +263,11 @@ pub fn load_pe_dt1(
     Ok(Array2::from_shape_vec((width, height), data)?.reversed_axes())
 }
 
-pub fn load_pe_hd(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta, Box<dyn Error>> {
+pub fn load_pe_hd(
+    filepath: &Path,
+    medium_velocity: f32,
+    override_antenna_mhz: Option<f32>,
+) -> Result<gpr::GPRMeta, Box<dyn Error>> {
     let content = std::fs::read_to_string(filepath)?;
 
     // Collect all rows into a hashmap, assuming a "KEY:VALUE" structure.
@@ -290,11 +302,12 @@ pub fn load_pe_hd(filepath: &Path, medium_velocity: f32) -> Result<gpr::GPRMeta,
             .ok_or("No 'TRACE INTERVAL (s)' key in metadata")?
             .replace(' ', "")
             .parse()?,
-        antenna_mhz: data
-            .get("NOMINAL FREQUENCY")
-            .ok_or("No 'NOMINAL FREQUENCY' key in metadata")?
-            .replace(' ', "")
-            .parse()?,
+        antenna_mhz: override_antenna_mhz.unwrap_or(
+            data.get("NOMINAL FREQUENCY")
+                .ok_or("No 'NOMINAL FREQUENCY' key in metadata")?
+                .replace(' ', "")
+                .parse()?,
+        ),
         antenna: data
             .get("NOMINAL FREQUENCY")
             .ok_or("No 'NOMINAL FREQUENCY' key in metadata")?
@@ -868,7 +881,7 @@ mod tests {
         // The rd3 file needs to exist, but it doesn't need to contain anything
         std::fs::write(&rd3_path, "").unwrap();
 
-        let gpr_meta = load_rad(&rad_path, 0.1).unwrap();
+        let gpr_meta = load_rad(&rad_path, 0.1, None).unwrap();
 
         // Check that the correct values were parsed
         assert_eq!(gpr_meta.samples, 2024);
@@ -880,6 +893,10 @@ mod tests {
         assert_eq!(gpr_meta.time_window, 2000.);
         assert_eq!(gpr_meta.last_trace, 40);
         assert_eq!(gpr_meta.data_filepath, rd3_path);
+
+        // Test overriding the antenna frequency
+        let gpr_meta = load_rad(&rad_path, 0.1, Some(200.)).unwrap();
+        assert_eq!(gpr_meta.antenna_mhz, 200.);
     }
 
     #[test]
@@ -926,7 +943,7 @@ mod tests {
         // The rd3 file needs to exist, but it doesn't need to contain anything
         std::fs::write(&rd3_path, "").unwrap();
 
-        let gpr_meta = crate::io::load_pe_hd(&rad_path, 0.1).unwrap();
+        let gpr_meta = crate::io::load_pe_hd(&rad_path, 0.1, None).unwrap();
 
         // Check that the correct values were parsed
         assert_eq!(gpr_meta.samples, 1625);
@@ -938,6 +955,10 @@ mod tests {
         assert_eq!(gpr_meta.time_window, 650.);
         assert_eq!(gpr_meta.last_trace, 9896);
         assert_eq!(gpr_meta.data_filepath, rd3_path);
+
+        // Test overriding the antenna frequency
+        let gpr_meta = crate::io::load_pe_hd(&rad_path, 0.1, Some(300.)).unwrap();
+        assert_eq!(gpr_meta.antenna_mhz, 300.);
     }
 
     #[test]

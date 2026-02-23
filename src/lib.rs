@@ -60,6 +60,7 @@ pub mod radal {
             render=None,
             no_export=false,
             merge=None,
+            override_antenna_mhz=None,
         )
     )]
     fn run_cli(
@@ -80,6 +81,7 @@ pub mod radal {
         render: Option<PathBuf>,
         no_export: bool,
         merge: Option<String>,
+        override_antenna_mhz: Option<f32>,
         _py: Python<'_>,
     ) -> PyResult<i32> {
         let track_opt: Option<Option<PathBuf>> = match track {
@@ -111,6 +113,7 @@ pub mod radal {
             render: render_opt,
             no_export,
             merge,
+            override_antenna_mhz,
         };
 
         // Use the shared core logic
